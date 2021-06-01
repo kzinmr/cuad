@@ -544,21 +544,21 @@ def build_args(notebook=False):
     # Other parameters
     parser.add_argument(
         "--data_dir",
-        default=None,
+        default='./data',
         type=str,
         help="The input data dir. Should contain the .json files for the task."
         + "If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
     )
     parser.add_argument(
         "--train_file",
-        default=None,
+        default='./data/train_separate_questions_parties.json',
         type=str,
         help="The input training file. If a data dir is specified, will look for the file there"
         + "If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
     )
     parser.add_argument(
         "--predict_file",
-        default=None,
+        default='./data/test_parties.json',
         type=str,
         help="The input evaluation file. If a data dir is specified, will look for the file there"
         + "If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
@@ -606,7 +606,7 @@ def build_args(notebook=False):
     )
     parser.add_argument(
         "--max_query_length",
-        default=64,
+        default=512,
         type=int,
         help="The maximum number of tokens for the question. Questions longer than this will "
         "be truncated to this length.",
@@ -620,9 +620,9 @@ def build_args(notebook=False):
         "--do_lower_case", action="store_true", help="Set this flag if you are using an uncased model."
     )
 
-    parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--per_gpu_train_batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument(
-        "--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for evaluation."
+        "--per_gpu_eval_batch_size", default=32, type=int, help="Batch size per GPU/CPU for evaluation."
     )
     parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument(
