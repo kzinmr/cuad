@@ -60,7 +60,6 @@ logger = logging.getLogger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_QUESTION_ANSWERING_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-
 def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -519,30 +518,26 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         return dataset, examples, features
     return dataset
 
-
-def main():
+def build_args(notebook=False):
     parser = argparse.ArgumentParser()
 
     # Required parameters
     parser.add_argument(
         "--model_type",
-        default=None,
+        default='roberta',
         type=str,
-        required=True,
         help="Model type selected in the list: " + ", ".join(MODEL_TYPES),
     )
     parser.add_argument(
         "--model_name_or_path",
-        default=None,
+        default='roberta-base',
         type=str,
-        required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models",
     )
     parser.add_argument(
         "--output_dir",
-        default=None,
+        default='./train_models/roberta-base',
         type=str,
-        required=True,
         help="The output directory where the model checkpoints and predictions will be written.",
     )
 
@@ -598,14 +593,14 @@ def main():
 
     parser.add_argument(
         "--max_seq_length",
-        default=384,
+        default=512,
         type=int,
         help="The maximum total input sequence length after WordPiece tokenization. Sequences "
         "longer than this will be truncated, and sequences shorter than this will be padded.",
     )
     parser.add_argument(
         "--doc_stride",
-        default=128,
+        default=256,
         type=int,
         help="When splitting up a long document into chunks, how much stride to take between chunks.",
     )
@@ -629,7 +624,7 @@ def main():
     parser.add_argument(
         "--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for evaluation."
     )
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
@@ -676,7 +671,7 @@ def main():
     )
 
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--eval_all_checkpoints",
         action="store_true",
@@ -709,7 +704,30 @@ def main():
 
     parser.add_argument("--threads", type=int, default=1, help="multiple threads for converting example to features")
     parser.add_argument("--keep_frac", type=float, default=1.0, help="The fraction of the balanced dataset to keep.")
-    args = parser.parse_args()
+
+    if notebook:
+        args = parser.parse_args(args=[])
+    else:
+        args = parser.parse_args()
+
+
+    # Setup CUDA, GPU & distributed training
+    if args.local_rank == -1 or args.no_cuda:
+        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
+    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+        torch.cuda.set_device(args.local_rank)
+        device = torch.device("cuda", args.local_rank)
+        torch.distributed.init_process_group(backend="nccl")
+        args.n_gpu = 1
+    args.device = device
+
+    args.model_type = args.model_type.lower()
+
+    return args
+
+def main():
+    args = build_args()
 
     if args.doc_stride >= args.max_seq_length - args.max_query_length:
         logger.warning(
@@ -739,17 +757,6 @@ def main():
         ptvsd.enable_attach(address=(args.server_ip, args.server_port), redirect_output=True)
         ptvsd.wait_for_attach()
 
-    # Setup CUDA, GPU & distributed training
-    if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
-    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.cuda.set_device(args.local_rank)
-        device = torch.device("cuda", args.local_rank)
-        torch.distributed.init_process_group(backend="nccl")
-        args.n_gpu = 1
-    args.device = device
-
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -777,7 +784,6 @@ def main():
         # Make sure only the first process in distributed training will download model & vocab
         torch.distributed.barrier()
 
-    args.model_type = args.model_type.lower()
     config = AutoConfig.from_pretrained(
         args.config_name if args.config_name else args.model_name_or_path,
         cache_dir=args.cache_dir if args.cache_dir else None,
